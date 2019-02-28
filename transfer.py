@@ -39,13 +39,16 @@ class tcp2tcp(object):
         if not arg2:
             for i in self.struct:
                 if arg1 in i:
-                    return i
+                    return i,i[0] if arg1 is i[1] else i[1]
+                else:
+                    return None,None
+            return None, None
         else:
             package = [arg1,arg2,True]
             self.struct.append(package)
             self.queue[arg1] = queue.Queue()
             self.queue[arg2] = queue.Queue()
-            return package
+            return package,None
 
     def __connect(self,remote_host,remote_port):
         try:
@@ -56,34 +59,62 @@ class tcp2tcp(object):
         except:
             print("连接失败")
             return None
-    def __disconnect(self,package):
-        print("用户退出")
-        package[0].close()
-        package[1].close()
-        del self.queue[package[0]]
-        del self.queue[package[1]]
-        if package[0] in self.inputs:
-            self.inputs.remove(package[0])
-        elif package[1] in self.inputs:
-            self.inputs.remove(package[1])
-        elif package[0] in self.outputs:
-            self.outputs.remove(package[0])
-        elif package[1] in self.outputs:
-            self.outputs.remove(package[1])
-        self.struct.remove(package)
+    def __memclear(self):
+        for i in self.struct:
+            if self.queue[i[0]].empty() and self.queue[i[1]].empty() and i[2] is False:
+                self.struct.remove(i)
+                if i[0] in self.inputs:
+                    self.inputs.remove(i[0])
+                elif i[1] in self.inputs:
+                    self.inputs.remove(i[1])
+                elif i[0] in self.outputs:
+                    self.outputs.remove(i[0])
+                elif i[1] in self.outputs:
+                    self.outputs.remove(i[1])
+
+
+            # for i in self.outputs:
+            #     pass
+    def __disconnect(self,conn):
+        print("用户退出", conn)
+        conn.close()
+        if conn in self.inputs:
+            self.inputs.remove(conn)
+        elif conn in self.outputs:
+            self.outputs.remove(conn)
+
+        package, s2 = self.__set_get(conn)
+        if not package:
+            return
+
+
+        package[2] = False
+
+        # if package[0] in self.inputs:
+        #     self.inputs.remove(package[0])
+        # elif package[1] in self.inputs:
+        #     self.inputs.remove(package[1])
+        # elif package[0] in self.outputs:
+        #     self.outputs.remove(package[0])
+        # elif package[1] in self.outputs:
+        #     self.outputs.remove(package[1])
+        # self.struct.remove(package)
     def __handle(self):
         self.inputs.append( self.server)
 
         while True:
             if self.flag:
                 return
-            print(self.inputs,self.outputs)
+
+            # print(self.inputs,self.outputs)
+            self.__memclear()
             r,w,e = select.select(self.inputs,self.outputs,self.inputs)
             # 读线程
             for s in r:
                 if s is self.server:
                     # 新用户进入
                     conn,addr = self.server.accept()
+
                     # 为新用户绑定远端套接字
                     i = 0
                     flag=True
@@ -106,37 +137,42 @@ class tcp2tcp(object):
                         self.__set_get(cli,conn)
                 else:
                     # 说明是老用户进入
-                    package = self.__set_get(s)
+
                     try:
                         recv = s.recv(20480)
                     except:
-                        self.__disconnect(package)
+                        self.__disconnect(s)
+                        continue
 
-                    if not recv:
+                    if not recv or len(recv) <0:
                         # 没消息了
-                        self.__disconnect(package)
-
+                        self.__disconnect(s)
+                        continue
                     else:
                         self.queue[s].put(recv)
-                        if s not in self.outputs:
-                            self.outputs.append(s)
+                        self.outputs.append(s)
             # 写线程
             for s in w:
-                package = self.__set_get(s)
+                package,s2 = self.__set_get(s)
+                if not package:
+                    print("emm")
+                    self.__disconnect(s)
+                    continue
                 try:
                     send_data = self.queue[s].get_nowait()
                 except queue.Empty:
-                    self.__disconnect(package)
+                    self.__disconnect(s)
+                    continue
                 else:
-                    if s is package[0]:
-                        package[1].sendall(send_data)
+                    s2.sendall(send_data)
+                    if package[2] is False:
+                        self.__disconnect(s)
                     else:
-                        package[0].sendall(send_data)
-                    self.outputs.remove(s)
+                        self.outputs.remove(s)
             for s in e:
                 print("有错误。")
-                package=self.__set_get(s)
-                self.__disconnect(package)
+                self.__disconnect(s)
+                continue
 
     def start(self,thread=False):
         if self.isloop:
