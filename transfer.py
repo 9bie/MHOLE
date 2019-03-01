@@ -155,7 +155,6 @@ class tcp2tcp(object):
             for s in w:
                 package,s2 = self.__set_get(s)
                 if not package:
-                    print("emm")
                     self.__disconnect(s)
                     continue
                 try:
@@ -183,8 +182,11 @@ class tcp2tcp(object):
             threading.Thread(target=self.__handle,args=()).start()
         else:
             self.__handle()
-
-
+class proxymn:
+    def __init__(self,port):
+        self.server = socket.socket()
+        self.server.bind(("0.0.0.0", port))
+        self.server.listen(10)
 if __name__ =="__main__":
-    a= tcp2tcp(801,"127.0.0.1",5000)
+    a= tcp2tcp(801,"127.0.0.1",3389)
     a.start()
