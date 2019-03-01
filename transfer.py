@@ -6,6 +6,28 @@ import select
 import threading
 import queue
 import time
+class plugin:
+    def __init__(self,func1,func2,func3,func4):
+        """
+        插件基类
+        :param func1: 客户进入处理函数
+        :param func2: 客户消息到达处理函数
+        :param func3: 客户退出处理函数
+        :param func4: 错误处理函数
+        """
+        self.func1 = func1
+        self.func2 = func2
+        self.func3 = func3
+        self.func4 = func4
+    def event(self,event_number,msg=None,conn1=None,conn2=None):
+        '''
+        :param event_number: 类似TCP状态码
+        :param msg: recv
+        :param conn1: send conn
+        :param conn2: recv conn
+        :return:
+        '''
+        pass
 class tcp2tcp(object):
     def __init__(self,local_port,remote_host,remote_port,reconn=-1):
         '''
@@ -25,10 +47,16 @@ class tcp2tcp(object):
         self.remote_host = remote_host
         self.remote_port = remote_port
         self.reconn = reconn
-        self.struct=[]#[[远端套接字，本地套接字，活动中],....]
+        self.struct=[]#[[远端套接字，本地套接字，活动中,插件],....]
         self.queue = {}
         self.outputs = []
         self.inputs=[]
+        self.mode = None
+    def load_plugin(self,object):
+        self.mode = object
+    def stop(self):
+        self.flag = True
+        print("线程已经停止了")
     def __set_get(self,arg1,arg2=None):
         '''
         设置或者查询
@@ -44,7 +72,7 @@ class tcp2tcp(object):
                     return None,None
             return None, None
         else:
-            package = [arg1,arg2,True]
+            package = [arg1,arg2,True,None]
             self.struct.append(package)
             self.queue[arg1] = queue.Queue()
             self.queue[arg2] = queue.Queue()
@@ -71,8 +99,6 @@ class tcp2tcp(object):
                     self.outputs.remove(i[0])
                 elif i[1] in self.outputs:
                     self.outputs.remove(i[1])
-
-
             # for i in self.outputs:
             #     pass
     def __disconnect(self,conn):
@@ -86,19 +112,7 @@ class tcp2tcp(object):
         package, s2 = self.__set_get(conn)
         if not package:
             return
-
-
         package[2] = False
-
-        # if package[0] in self.inputs:
-        #     self.inputs.remove(package[0])
-        # elif package[1] in self.inputs:
-        #     self.inputs.remove(package[1])
-        # elif package[0] in self.outputs:
-        #     self.outputs.remove(package[0])
-        # elif package[1] in self.outputs:
-        #     self.outputs.remove(package[1])
-        # self.struct.remove(package)
     def __handle(self):
         self.inputs.append( self.server)
 
@@ -130,6 +144,10 @@ class tcp2tcp(object):
                             break
                         time.sleep(3)
                     if flag:
+                        if self.mode:
+                            # 加载mod
+                            pass
+                            # self.mode.event(0,None,conn,cli)
                         # 如果绑定远端套接字成功则加入处理列表
                         self.inputs.append(conn)
                         # 远端套接字也要作为收管道进行handle
@@ -149,6 +167,8 @@ class tcp2tcp(object):
                         self.__disconnect(s)
                         continue
                     else:
+                        if self.mode:
+                            pass
                         self.queue[s].put(recv)
                         self.outputs.append(s)
             # 写线程
@@ -182,11 +202,7 @@ class tcp2tcp(object):
             threading.Thread(target=self.__handle,args=()).start()
         else:
             self.__handle()
-class proxymn:
-    def __init__(self,port):
-        self.server = socket.socket()
-        self.server.bind(("0.0.0.0", port))
-        self.server.listen(10)
+
 if __name__ =="__main__":
     a= tcp2tcp(801,"127.0.0.1",3389)
     a.start()
