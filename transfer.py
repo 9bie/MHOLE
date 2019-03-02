@@ -6,28 +6,28 @@ import select
 import threading
 import queue
 import time
-class plugin:
-    def __init__(self,func1,func2,func3,func4):
-        """
-        插件基类
-        :param func1: 客户进入处理函数
-        :param func2: 客户消息到达处理函数
-        :param func3: 客户退出处理函数
-        :param func4: 错误处理函数
-        """
-        self.func1 = func1
-        self.func2 = func2
-        self.func3 = func3
-        self.func4 = func4
-    def event(self,event_number,msg=None,conn1=None,conn2=None):
-        '''
-        :param event_number: 类似TCP状态码
-        :param msg: recv
-        :param conn1: send conn
-        :param conn2: recv conn
-        :return:
-        '''
-        pass
+# class plugin:
+#     def __init__(self,func1,func2,func3,func4):
+#         """
+#         插件基类
+#         :param func1: 客户进入处理函数
+#         :param func2: 客户消息到达处理函数
+#         :param func3: 客户退出处理函数
+#         :param func4: 错误处理函数
+#         """
+#         self.func1 = func1
+#         self.func2 = func2
+#         self.func3 = func3
+#         self.func4 = func4
+#     def event(self,event_number,msg=None,conn1=None,conn2=None):
+#         '''
+#         :param event_number: 类似TCP状态码
+#         :param msg: recv
+#         :param conn1: send conn
+#         :param conn2: recv conn
+#         :return:
+#         '''
+#         pass
 class tcp2tcp(object):
     def __init__(self,local_port,remote_host,remote_port,reconn=-1):
         '''
@@ -51,7 +51,6 @@ class tcp2tcp(object):
         self.queue = {}
         self.outputs = []
         self.inputs=[]
-        self.mode = None
     def load_plugin(self,object):
         self.mode = object
     def stop(self):
@@ -144,10 +143,6 @@ class tcp2tcp(object):
                             break
                         time.sleep(3)
                     if flag:
-                        if self.mode:
-                            # 加载mod
-                            pass
-                            # self.mode.event(0,None,conn,cli)
                         # 如果绑定远端套接字成功则加入处理列表
                         self.inputs.append(conn)
                         # 远端套接字也要作为收管道进行handle
@@ -167,8 +162,6 @@ class tcp2tcp(object):
                         self.__disconnect(s)
                         continue
                     else:
-                        if self.mode:
-                            pass
                         self.queue[s].put(recv)
                         self.outputs.append(s)
             # 写线程
@@ -202,7 +195,97 @@ class tcp2tcp(object):
             threading.Thread(target=self.__handle,args=()).start()
         else:
             self.__handle()
+class httproxy(object):
+    '''
+    copyright from <PythonProxy.py>
+    '''
+    def __init__(self,port,timeout=60):
+        self.s = socket.socket()
+        self.s.bind(("0.0.0.0",port))
+        self.s.listen(10)
+        self.timeout = timeout
+        self.client_buffer=''
+        self.BUFLEN = 8192
+        self.VERSION = 'Python Proxy/0.1.1 modified from bakabie'
+        self.HTTPVER = 'HTTP/1.1'
+    def get_base_header(self):
+        while 1:
+            self.client_buffer += self.client.recv(self.BUFLEN).decode()
+            if not self.client_buffer:
+                return None,None,None
+            end = self.client_buffer.find('\n')
+            print(end)
+            if end != -1:
+                break
+        print('%s' % self.client_buffer[:end])  # debug
+        data = (self.client_buffer[:end + 1]).split()
+        self.client_buffer = self.client_buffer[end + 1:]
+        return data
+    def _connect_target(self, host):
+        i = host.find(':')
+        if i!=-1:
+            port = int(host[i+1:])
+            host = host[:i]
+        else:
+            port = 80
+        (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
+        self.target = socket.socket(soc_family)
+        self.target.connect(address)
+    def _read_write(self):
+        time_out_max = self.timeout/3
+        socs = [self.client, self.target]
+        count = 0
+        while 1:
+            count += 1
+            (recv, _, error) = select.select(socs, [], socs, 3)
+            if error:
+                break
+            if recv:
+                for in_ in recv:
+                    data = in_.recv(self.BUFLEN)
+                    if in_ is self.client:
+                        out = self.target
+                    else:
+                        out = self.client
+                    if data:
+                        out.send(data)
+                        count = 0
+            if count == time_out_max:
+                break
+    def method_CONNECT(self):
+        self._connect_target(self.path)
+        self.client.send((self.HTTPVER + ' 200 Connection established\n' +
+                         'Proxy-agent: %s\n\n' % self.VERSION).encode())
+        self.client_buffer = ''
+        self._read_write()
+    def method_others(self):
+        self.path = self.path[7:]
+        i = self.path.find('/')
+        host = self.path[:i]
+        path = self.path[i:]
+        self._connect_target(host)
+        self.target.send(('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer).encode("utf-8"))
+        self.client_buffer = ''
+        self._read_write()
+    def __real_start(self):
+        while True:
+            self.client,self.address = self.s.accept()
+            self.method, self.path, self.protocol = self.get_base_header()
 
+            if self.method == 'CONNECT':
+                print("CONNECT")
+                self.method_CONNECT()
+            elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
+                                 'DELETE', 'TRACE'):
+                print("OHTER")
+                self.method_others()
+            self.client.close()
+            self.target.close()
+    def start(self,thread=False):
+        if thread:
+            threading.Thread(target=self.__real_start,args=()).start()
+        else:
+            self.__real_start()
 if __name__ =="__main__":
-    a= tcp2tcp(801,"127.0.0.1",3389)
+    a= httproxy(8082)
     a.start()
