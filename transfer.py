@@ -197,43 +197,34 @@ class tcp2tcp(object):
             self.__handle()
 class httproxy(object):
     '''
-    copyright from <PythonProxy.py>
+    copyright from <PythonProxy.py> modified by bakabie
     '''
     def __init__(self,port,timeout=60):
         self.s = socket.socket()
         self.s.bind(("0.0.0.0",port))
         self.s.listen(10)
         self.timeout = timeout
-        self.client_buffer=''
+
         self.BUFLEN = 8192
-        self.VERSION = 'Python Proxy/0.1.1 modified from bakabie'
+        self.VERSION = 'Python Proxy/0.1.1 modified by bakabie'
         self.HTTPVER = 'HTTP/1.1'
-    def get_base_header(self):
+    def __get_base_header(self,client):
+        client_buffer=""
         while 1:
-            self.client_buffer += self.client.recv(self.BUFLEN).decode()
-            if not self.client_buffer:
-                return None,None,None
-            end = self.client_buffer.find('\n')
-            print(end)
+            client_buffer += client.recv(self.BUFLEN).decode()
+            end = client_buffer.find('\n')
             if end != -1:
                 break
-        print('%s' % self.client_buffer[:end])  # debug
-        data = (self.client_buffer[:end + 1]).split()
-        self.client_buffer = self.client_buffer[end + 1:]
+        print('%s' % client_buffer[:end])  # debug
+        data = (client_buffer[:end + 1]).split()
+        client_buffer = client_buffer[end + 1:]
+        data.append(client_buffer)
+
         return data
-    def _connect_target(self, host):
-        i = host.find(':')
-        if i!=-1:
-            port = int(host[i+1:])
-            host = host[:i]
-        else:
-            port = 80
-        (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
-        self.target = socket.socket(soc_family)
-        self.target.connect(address)
-    def _read_write(self):
-        time_out_max = self.timeout/3
-        socs = [self.client, self.target]
+
+    def _read_write(self,client,target):
+        time_out_max = self.timeout / 3
+        socs = [client, target]
         count = 0
         while 1:
             count += 1
@@ -243,47 +234,55 @@ class httproxy(object):
             if recv:
                 for in_ in recv:
                     data = in_.recv(self.BUFLEN)
-                    if in_ is self.client:
-                        out = self.target
+                    if in_ is client:
+                        out = target
                     else:
-                        out = self.client
+                        out = client
                     if data:
                         out.send(data)
                         count = 0
             if count == time_out_max:
                 break
-    def method_CONNECT(self):
-        self._connect_target(self.path)
-        self.client.send((self.HTTPVER + ' 200 Connection established\n' +
-                         'Proxy-agent: %s\n\n' % self.VERSION).encode())
-        self.client_buffer = ''
-        self._read_write()
-    def method_others(self):
-        self.path = self.path[7:]
-        i = self.path.find('/')
-        host = self.path[:i]
-        path = self.path[i:]
-        self._connect_target(host)
-        self.target.send(('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer).encode("utf-8"))
-        self.client_buffer = ''
-        self._read_write()
+    def _connect_target(self, host):
+        i = host.find(':')
+        if i != -1:
+            port = int(host[i + 1:])
+            host = host[:i]
+        else:
+            port = 80
+        (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
+        target = socket.socket(soc_family)
+        target.connect(address)
+        return target
+    def __handle(self,client,address):
+        method,path,protocol,client_buffer =self.__get_base_header(client)
+        if method == 'CONNECT':
+            target = self._connect_target(path)
+            client.send((self.HTTPVER + ' 200 Connection established\n' +
+                        'Proxy-agent: %s\n\n' % self.VERSION).encode())
+            self._read_write(client=client,target=target)
+            client.close()
+            target.close()
+        elif method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
+                             'DELETE', 'TRACE'):
+            path = path[7:]
+            i = path.find('/')
+            host = path[:i]
+            path2 = path[i:]
+            target = self._connect_target(host)
+            target.send(('%s %s %s\n' % (method, path2, protocol) +
+                        client_buffer).encode())
+            self._read_write(client=client,target=target)
+            client.close()
+            target.close()
+
     def __real_start(self):
         while True:
-            self.client,self.address = self.s.accept()
-            self.method, self.path, self.protocol = self.get_base_header()
-
-            if self.method == 'CONNECT':
-                print("CONNECT")
-                self.method_CONNECT()
-            elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
-                                 'DELETE', 'TRACE'):
-                print("OHTER")
-                self.method_others()
-            self.client.close()
-            self.target.close()
+                conn,address = self.s.accept()
+                threading.Thread(target=self.__handle,args=(conn,address)).start()
     def start(self,thread=False):
         if thread:
-            threading.Thread(target=self.__real_start,args=()).start()
+            threading.Thread(target=self.__real_start)
         else:
             self.__real_start()
 if __name__ =="__main__":
