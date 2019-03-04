@@ -8,3 +8,5 @@
   - HTTP/HTTPS 代理or反弹代理
 
   - socks5代理
+
+  - socks5 转http or http 转 socks5代理
