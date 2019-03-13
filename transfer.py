@@ -286,5 +286,17 @@ class httproxy(object):
         else:
             self.__real_start()
 if __name__ =="__main__":
-    a= httproxy(8082)
-    a.start()
+    text="""
+    ########################MY HOLE#########################
+    # WHAT 'S THIS?  JUST A SOCKETS/WEB TOOLKIT FOR MYSELF #
+    # HOW TO USE IT?                                       #
+    # <MHOLE.PY> -M [MOD] -B [LOCAL PORT] \                #
+    #           -R [REMOTEADDRESS:PORT] -N [RECONNECT NUM] #
+    # YOU CAN USE THESE MOD:                               #
+    # TCP2TCP:  A SOCKET TRANSFER TOOLKIE. SET LOCAL PORT\ #
+    #         AND REMOTE PORT ABD RECONNECT NUMBER. ANY  \ #
+    #         DATE PASS HERE WILL TRANSFER TO OTHER WAT. \ #
+    #        OF COUSE,THIS CAN USE TO  SOLE PLCAING AGENCY #
+    # HTTPROXY: A SIMPLE HTTP PROXY FROM <PYTHONPROXY.PY>  #
+    ########################################################
+    """
