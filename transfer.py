@@ -285,6 +285,39 @@ class httproxy(object):
             threading.Thread(target=self.__real_start)
         else:
             self.__real_start()
+class myHoleServer(object):
+    def __init__(self,remote_address,username,passwd):
+        pass
+    def register_identify(self,host):
+        """
+        register the domain to handle,while remote server receive the\
+        http packet,they whill transfer it to you or other according to this identifier.
+
+        :param host: identifier
+        :return:
+        """
+    def start(self,service=False):
+        """
+
+        :param service:
+        :return:
+        """
+        pass
+class myHoleClient(object):
+    def __init__(self,port):
+        pass
+    def start(self,service=False):
+        pass
+class http2socks5(object):
+    def __init__(self,httproxy_host,httproxy_port,local_socks5_port):
+        pass
+    def start(self,thread=False):
+        pass
+class socks2http(object):
+    def __init__(self,socks5_host,socks5_port,local_http_port,socks5_username=None,socks5_passwd=None):
+        pass
+    def start(self,thread=False):
+        pass
 if __name__ =="__main__":
     text="""
     ########################MY HOLE#########################
@@ -300,3 +333,4 @@ if __name__ =="__main__":
     # HTTPROXY: A SIMPLE HTTP PROXY FROM <PYTHONPROXY.PY>  #
     ########################################################
     """
+    print(text)
