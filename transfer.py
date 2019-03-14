@@ -2,7 +2,7 @@
 # 搬运模块
 import socket
 import select
-
+import struct
 import threading
 import queue
 import time
@@ -308,6 +308,12 @@ class myHoleClient(object):
         pass
     def start(self,service=False):
         pass
+class socks5proxy(object):
+    def __init__(self,port,username="",password=""):
+        self.SOCKS_VERSION = 5
+        self.s = socket.socket()
+        self.s.bind(("0.0.0.0", port))
+        self.s.listen(10)
 class http2socks5(object):
     def __init__(self,httproxy_host,httproxy_port,local_socks5_port):
         pass
